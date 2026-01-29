@@ -2,9 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Plus, Building, Trash2, ArrowRight } from 'lucide-react';
 import { Button, Card, Badge } from '../components/ui';
-import { getUserFacilities, deleteFacility } from '../services/supabaseService';
+import { getMyFacilities, deleteFacility } from '../services/supabaseService';
 
-export const Dashboard: React.FC<{ user: any }> = ({ user }) => {
+export const Dashboard: React.FC = () => {
   const [facilities, setFacilities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
@@ -12,7 +12,7 @@ export const Dashboard: React.FC<{ user: any }> = ({ user }) => {
   const load = async () => {
     setLoading(true);
     try {
-      const data = await getUserFacilities();
+      const data = await getMyFacilities();
       setFacilities(data);
     } catch (e) {
       console.error(e);
@@ -38,7 +38,7 @@ export const Dashboard: React.FC<{ user: any }> = ({ user }) => {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-12">
         <div>
           <h1 className="text-4xl font-black text-brand-500">My Portfolio</h1>
-          <p className="text-gray-500 mt-2 font-medium">Manage and view performance reports for your submitted buildings.</p>
+          <p className="text-gray-500 mt-2 font-medium">Manage and view performance reports for buildings submitted from this device.</p>
         </div>
         <Button onClick={() => navigate('/add-facility')} className="px-8 py-4 bg-brand-accent text-brand-500 font-black rounded-xl hover:bg-yellow-500">
           <Plus size={20} className="mr-2"/> New Submission
@@ -50,7 +50,7 @@ export const Dashboard: React.FC<{ user: any }> = ({ user }) => {
       ) : facilities.length === 0 ? (
         <Card className="p-20 text-center border-dashed border-2 border-gray-200 shadow-none">
            <Building className="mx-auto text-gray-200 mb-6" size={64}/>
-           <h3 className="text-xl font-bold text-gray-900">No facilities found</h3>
+           <h3 className="text-xl font-bold text-gray-900">No submissions found</h3>
            <p className="text-gray-500 mb-8 max-w-sm mx-auto">Start contributing to the baseline by adding your first facility record.</p>
            <Button onClick={() => navigate('/add-facility')}>Get Started</Button>
         </Card>

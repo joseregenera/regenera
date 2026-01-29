@@ -1,16 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronRight, ChevronLeft, Upload, AlertCircle } from 'lucide-react';
+import { ChevronRight, ChevronLeft, AlertCircle } from 'lucide-react';
 import { Button, Card, Input, Select } from '../components/ui';
-import { BuildingCategory, User } from '../types';
+import { BuildingCategory } from '../types';
 import { CATEGORIES_LIST, MONTH_NAMES } from '../constants';
 import { saveFacility } from '../services/supabaseService';
 
-interface WizardProps {
-  user: User;
-}
-
-export const Wizard: React.FC<WizardProps> = ({ user }) => {
+export const Wizard: React.FC = () => {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
@@ -61,7 +57,7 @@ export const Wizard: React.FC<WizardProps> = ({ user }) => {
     <div className="max-w-4xl mx-auto px-4 py-16">
       <div className="text-center mb-12">
         <h1 className="text-3xl font-extrabold text-gray-900">Benchmark Your Facility</h1>
-        <p className="text-gray-500 mt-2">Accurate data ensures a stronger national baseline.</p>
+        <p className="text-gray-500 mt-2">Submit your data anonymously to join the national baseline.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -87,7 +83,7 @@ export const Wizard: React.FC<WizardProps> = ({ user }) => {
 
           {step === 1 && (
             <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
-              <Input label="Building Reference (Private)" placeholder="e.g. Panama HQ" value={internalLabel} onChange={e => setInternalLabel(e.target.value)} />
+              <Input label="Building Reference (Stored locally on your device)" placeholder="e.g. Panama HQ" value={internalLabel} onChange={e => setInternalLabel(e.target.value)} />
               <Select label="Sector Type *" value={category} onChange={e => setCategory(e.target.value as any)} options={CATEGORIES_LIST.map(c => ({ value: c, label: c }))} />
               <Input label="Gross Floor Area (m²) *" type="number" placeholder="0.00" value={area} onChange={e => setArea(e.target.value)} />
               <div className="flex justify-end pt-4"><Button onClick={() => setStep(2)} disabled={!validateStep1()}>Continue <ChevronRight size={16}/></Button></div>
@@ -98,7 +94,7 @@ export const Wizard: React.FC<WizardProps> = ({ user }) => {
             <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
               <div className="bg-brand-50 p-4 rounded-lg flex gap-3">
                  <AlertCircle className="text-brand-500 flex-shrink-0" size={20}/>
-                 <p className="text-xs text-brand-700 font-medium">Please provide the actual monthly kWh for the last 12-month period. All values must be greater than or equal to zero.</p>
+                 <p className="text-xs text-brand-700 font-medium">Please provide the actual monthly kWh for the last 12-month period. All values must be numbers ≥ 0.</p>
               </div>
               
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">

@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { jsPDF } from 'jspdf';
@@ -5,7 +6,8 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { Download, ArrowLeft, Building } from 'lucide-react';
 import { Button, Card, Badge } from '../components/ui';
 import { Facility, BenchmarkResult } from '../types';
-import { supabase } from '../lib/supabaseClient';
+// Fix: Use default import for supabase instead of named import
+import supabase from '../lib/supabaseClient';
 import { getBenchmarkStats } from '../services/supabaseService';
 
 export const ResultsPage: React.FC = () => {

@@ -1,49 +1,33 @@
 import { createClient } from '@supabase/supabase-js';
 
 /**
- * Robustly retrieves environment variables from various possible sources.
- * Prioritizes process.env as per the environment guidelines.
+ * Safely retrieves environment variables. 
+ * In browser-native ESM (implied by importmap usage), import.meta.env is undefined.
+ * The preview environment typically shims process.env for injected variables.
  */
 const getEnvVar = (key: string): string => {
-  // 1. Try process.env (standard in this execution context)
-  try {
-    if (typeof process !== 'undefined' && process.env && process.env[key]) {
-      return process.env[key] as string;
-    }
-  } catch (e) {
-    // process.env might not be accessible in all scopes
+  // Check process.env first (common in shimmed environments)
+  if (typeof process !== 'undefined' && process.env && process.env[key]) {
+    return process.env[key] as string;
   }
-
-  // 2. Try import.meta.env (Vite standard)
-  try {
-    const metaEnv = (import.meta as any).env;
-    if (metaEnv && metaEnv[key]) {
-      return metaEnv[key] as string;
-    }
-  } catch (e) {
-    // import.meta.env might not be defined
+  
+  // Fallback to import.meta.env for standard Vite builds
+  const meta = import.meta as any;
+  if (meta.env && meta.env[key]) {
+    return meta.env[key] as string;
   }
 
   return '';
 };
 
-// Check for both prefixed and non-prefixed versions
-const supabaseUrl = getEnvVar('VITE_SUPABASE_URL') || getEnvVar('SUPABASE_URL');
-const supabaseAnonKey = getEnvVar('VITE_SUPABASE_ANON_KEY') || getEnvVar('SUPABASE_ANON_KEY');
+const supabaseUrl = getEnvVar('VITE_SUPABASE_URL');
+const supabaseAnonKey = getEnvVar('VITE_SUPABASE_ANON_KEY');
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error(
-    "CRITICAL: Supabase credentials are missing. " +
-    "Please ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set in your environment variables."
-  );
-}
-
-/**
- * Initialize the Supabase client.
- * We provide a fallback string to prevent 'supabaseUrl is required' initialization crash,
- * allowing the UI to render so the user can see error states or instructions.
- */
-export const supabase = createClient(
-  supabaseUrl || 'https://missing-supabase-url.supabase.co',
-  supabaseAnonKey || 'missing-supabase-anon-key'
+// We provide default placeholder strings if keys are missing to prevent 
+// initialization crashes, allowing the UI to load and display appropriate errors.
+const supabase = createClient(
+  supabaseUrl || 'https://placeholder.supabase.co',
+  supabaseAnonKey || 'placeholder-key'
 );
+
+export default supabase;

@@ -1,25 +1,11 @@
 import React from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Menu, X, ShieldCheck, LogOut, User as UserIcon } from 'lucide-react';
-import { User } from '../types';
-import { logoutUser } from '../services/supabaseService';
+import { Menu, X } from 'lucide-react';
 
-interface LayoutProps {
-  children: React.ReactNode;
-  user: User | null;
-  setUser: (u: User | null) => void;
-}
-
-export const Layout: React.FC<LayoutProps> = ({ children, user, setUser }) => {
+export const Layout: React.FC<{ children: React.ReactNode; user: any; setUser: any }> = ({ children }) => {
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-
-  const handleLogout = async () => {
-    await logoutUser();
-    setUser(null);
-    navigate('/');
-  };
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -29,13 +15,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, setUser }) => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-20">
             <div className="flex items-center gap-6 cursor-pointer" onClick={() => navigate('/')}>
-               {/* Goal 1: Logo Image */}
                <img 
                  src="/regenera-logo.svg" 
                  alt="Regenera Logo" 
                  className="h-10 w-auto" 
                  onError={(e) => {
-                   // Fallback if logo doesn't exist yet
                    e.currentTarget.style.display = 'none';
                    const parent = e.currentTarget.parentElement;
                    if (parent) {
@@ -57,30 +41,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, setUser }) => {
               <Link to="/public-benchmark" className={`text-sm font-semibold transition-colors ${isActive('/public-benchmark') ? 'text-brand-500' : 'text-gray-500 hover:text-brand-500'}`}>
                 Public Baseline
               </Link>
-              {user ? (
-                <>
-                  <Link to="/dashboard" className={`text-sm font-semibold transition-colors ${isActive('/dashboard') ? 'text-brand-500' : 'text-gray-500 hover:text-brand-500'}`}>
-                    Dashboard
-                  </Link>
-                  <div className="relative group">
-                    <button className="flex items-center gap-3 text-sm font-bold text-gray-700 hover:text-brand-500 focus:outline-none">
-                      <div className="w-9 h-9 rounded-full bg-brand-50 flex items-center justify-center border border-brand-100 text-brand-500">
-                         <UserIcon size={18} />
-                      </div>
-                      <span>{user.name}</span>
-                    </button>
-                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl py-2 border border-gray-100 hidden group-hover:block transition-all animate-in fade-in slide-in-from-top-1">
-                      <button onClick={handleLogout} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
-                        <LogOut size={14} /> Sign out
-                      </button>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <Link to="/login" className="inline-flex items-center justify-center px-6 py-2.5 rounded-full text-sm font-bold text-white bg-brand-500 hover:bg-brand-600 shadow-sm transition-all">
-                  Join Baseline
-                </Link>
-              )}
+              <Link to="/dashboard" className={`text-sm font-semibold transition-colors ${isActive('/dashboard') ? 'text-brand-500' : 'text-gray-500 hover:text-brand-500'}`}>
+                My Portfolio
+              </Link>
+              <Link to="/add-facility" className="inline-flex items-center justify-center px-6 py-2.5 rounded-full text-sm font-bold text-white bg-brand-500 hover:bg-brand-600 shadow-sm transition-all">
+                Add Submission
+              </Link>
             </div>
 
             <div className="flex items-center md:hidden">
@@ -93,15 +59,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, setUser }) => {
 
         {isMenuOpen && (
           <div className="md:hidden bg-white border-b border-gray-100 p-4 space-y-4">
-              <Link to="/public-benchmark" className="block text-gray-600 font-semibold">Public Baseline</Link>
-              {user ? (
-                <>
-                  <Link to="/dashboard" className="block text-gray-600 font-semibold">Dashboard</Link>
-                  <button onClick={handleLogout} className="text-gray-400 font-semibold flex items-center gap-2"><LogOut size={16}/> Sign Out</button>
-                </>
-              ) : (
-                <Link to="/login" className="block text-brand-500 font-bold">Sign In</Link>
-              )}
+              <Link to="/public-benchmark" className="block text-gray-600 font-semibold" onClick={() => setIsMenuOpen(false)}>Public Baseline</Link>
+              <Link to="/dashboard" className="block text-gray-600 font-semibold" onClick={() => setIsMenuOpen(false)}>My Portfolio</Link>
+              <Link to="/add-facility" className="block text-brand-500 font-bold" onClick={() => setIsMenuOpen(false)}>Add Submission</Link>
           </div>
         )}
       </header>

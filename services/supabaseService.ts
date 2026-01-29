@@ -1,48 +1,28 @@
+import supabase from '../lib/supabaseClient';
+import { BenchmarkResult, BuildingCategory } from '../types';
 
-import { supabase } from '../lib/supabaseClient';
-import { Facility, User, BenchmarkResult, MonthlyData, BuildingCategory } from '../types';
-
-export const loginUser = async (email: string) => {
-  // For MVP/Demo, we use magic links or simple OTP. 
-  // User explicitly asked for Admin/User functionality.
-  // Using 'as any' to bypass error: Property 'signInWithOtp' does not exist on type 'SupabaseAuthClient'
-  const { data, error } = await (supabase.auth as any).signInWithOtp({ email });
-  if (error) throw error;
-  return data;
-};
-
-export const logoutUser = async () => {
-  // Using 'as any' to bypass error: Property 'signOut' does not exist on type 'SupabaseAuthClient'
-  await (supabase.auth as any).signOut();
-};
-
-export const getCurrentUser = async (): Promise<User | null> => {
-  // Using 'as any' to bypass error: Property 'getUser' does not exist on type 'SupabaseAuthClient'
-  const { data: { user } } = await (supabase.auth as any).getUser();
-  if (!user) return null;
-  return {
-    id: user.id,
-    email: user.email || '',
-    name: user.email?.split('@')[0] || 'User',
-    role: 'USER' as any // Roles can be managed via a public.profiles table in a full app
-  };
-};
-
-export const saveFacility = async (facilityData: Partial<Facility> & { monthly_kwh: number[] }) => {
-  // Using 'as any' to bypass error: Property 'getUser' does not exist on type 'SupabaseAuthClient'
-  const { data: { user } } = await (supabase.auth as any).getUser();
-  
+/**
+ * Saves a facility submission to Supabase.
+ * Strictly adheres to the schema: facility_type, area_m2, monthly_kwh, annual_kwh, eui, country, internal_label.
+ */
+export const saveFacility = async (facilityData: {
+  category: BuildingCategory;
+  areaM2: number;
+  monthly_kwh: number[];
+  internalLabel?: string;
+  notes?: string;
+}) => {
   const annual_kwh = facilityData.monthly_kwh.reduce((a, b) => a + b, 0);
   const eui = annual_kwh / (facilityData.areaM2 || 1);
 
   const payload = {
-    user_id: user?.id,
     facility_type: facilityData.category,
     area_m2: facilityData.areaM2,
     monthly_kwh: facilityData.monthly_kwh,
     annual_kwh,
     eui,
     internal_label: facilityData.internalLabel,
+    notes: facilityData.notes,
     country: 'Panama'
   };
 
@@ -53,28 +33,35 @@ export const saveFacility = async (facilityData: Partial<Facility> & { monthly_k
     .single();
 
   if (error) throw error;
+  
+  // Store the submission ID locally to track "My Portfolio" without accounts
+  const localIds = JSON.parse(localStorage.getItem('peb_submission_ids') || '[]');
+  localStorage.setItem('peb_submission_ids', JSON.stringify([...localIds, data.id]));
+  
   return data;
 };
 
-export const getUserFacilities = async () => {
-  // Using 'as any' to bypass error: Property 'getUser' does not exist on type 'SupabaseAuthClient'
-  const { data: { user } } = await (supabase.auth as any).getUser();
-  if (!user) return [];
+/**
+ * Retrieves facilities based on the IDs stored in local storage.
+ */
+export const getMyFacilities = async () => {
+  const localIds = JSON.parse(localStorage.getItem('peb_submission_ids') || '[]');
+  if (localIds.length === 0) return [];
 
   const { data, error } = await supabase
     .from('facility_energy_submissions')
     .select('*')
-    .eq('user_id', user.id);
+    .in('id', localIds);
 
   if (error) throw error;
   return data.map(row => ({
     id: row.id,
-    userId: row.user_id,
     internalLabel: row.internal_label,
     category: row.facility_type,
     areaM2: row.area_m2,
     createdAt: row.created_at,
-    data: row.monthly_kwh.map((kwh: number, i: number) => ({ month: i + 1, year: 2023, kwh }))
+    annual_kwh: row.annual_kwh,
+    eui: row.eui
   }));
 };
 
@@ -83,11 +70,17 @@ export const deleteFacility = async (id: string) => {
     .from('facility_energy_submissions')
     .delete()
     .eq('id', id);
-  if (error) throw error;
+  
+  if (!error) {
+    const localIds = JSON.parse(localStorage.getItem('peb_submission_ids') || '[]');
+    localStorage.setItem('peb_submission_ids', JSON.stringify(localIds.filter((lid: string) => lid !== id)));
+  }
 };
 
+/**
+ * Computes benchmark statistics from the actual Supabase dataset.
+ */
 export const getBenchmarkStats = async (facilityType: string, userEui: number): Promise<BenchmarkResult> => {
-  // Fetch peer data for the same sector
   const { data: peers, error } = await supabase
     .from('facility_energy_submissions')
     .select('eui')
@@ -99,13 +92,16 @@ export const getBenchmarkStats = async (facilityType: string, userEui: number): 
   const sampleSize = euis.length;
   
   // Median
-  const mid = Math.floor(sampleSize / 2);
-  const categoryMedianEui = sampleSize % 2 !== 0 ? euis[mid] : (euis[mid - 1] + euis[mid]) / 2;
+  let categoryMedianEui = 0;
+  if (sampleSize > 0) {
+    const mid = Math.floor(sampleSize / 2);
+    categoryMedianEui = sampleSize % 2 !== 0 ? euis[mid] : (euis[mid - 1] + euis[mid]) / 2;
+  }
 
-  // Percentile (Lower EUI is better)
-  // Rank is how many peers have a WORSE (higher) EUI than you
-  const betterThan = euis.filter(e => e > userEui).length;
-  const percentile = sampleSize > 0 ? Math.round((betterThan / sampleSize) * 100) : 0;
+  // Percentile (Lower EUI is better, so rank-based percentile where 100 is most efficient)
+  // Percentile = (Number of peers with higher EUI / Total) * 100
+  const higherThan = euis.filter(e => e > userEui).length;
+  const percentile = sampleSize > 0 ? Math.round((higherThan / sampleSize) * 100) : 0;
 
   return {
     facilityId: '',
@@ -117,7 +113,7 @@ export const getBenchmarkStats = async (facilityType: string, userEui: number): 
     categoryMedianEui: categoryMedianEui || 0,
     percentile,
     sampleSize,
-    isSufficientData: sampleSize >= 3 // Adjusted threshold for live data
+    isSufficientData: sampleSize >= 3
   };
 };
 
@@ -134,7 +130,6 @@ export const getPublicAggregates = async () => {
     return acc;
   }, {} as Record<string, number[]>);
 
-  // Cast Object.entries result to resolve 'unknown' type inference on euis
   return (Object.entries(groups) as [string, number[]][]).map(([category, euis]) => {
     euis.sort((a, b) => a - b);
     const mid = Math.floor(euis.length / 2);
@@ -143,8 +138,8 @@ export const getPublicAggregates = async () => {
       category: category as any,
       count: euis.length,
       medianEui: Math.round(median),
-      p25Eui: euis[Math.floor(euis.length * 0.25)],
-      p75Eui: euis[Math.floor(euis.length * 0.75)]
+      p25Eui: euis[Math.floor(euis.length * 0.25)] || 0,
+      p75Eui: euis[Math.floor(euis.length * 0.75)] || 0
     };
   });
 };
