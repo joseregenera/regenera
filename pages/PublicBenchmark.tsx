@@ -1,73 +1,81 @@
-import React from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
+import React, { useEffect, useState } from 'react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Card } from '../components/ui';
-import { MOCK_BASELINE_STATS, SAMPLE_THRESHOLD_N } from '../constants';
+import { getPublicAggregates } from '../services/supabaseService';
 
 export const PublicBenchmark: React.FC = () => {
-  // Filter stats to only show those with sufficient data
-  const data = MOCK_BASELINE_STATS.filter(s => s.count >= SAMPLE_THRESHOLD_N);
-  const insufficient = MOCK_BASELINE_STATS.filter(s => s.count < SAMPLE_THRESHOLD_N);
+  const [stats, setStats] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const data = await getPublicAggregates();
+        setStats(data);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
+
+  const totalBuildings = stats.reduce((acc, curr) => acc + curr.count, 0);
 
   return (
     <div className="bg-gray-50 min-h-screen">
-      <div className="bg-brand-900 py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-           <h1 className="text-3xl font-extrabold text-white">National Baseline Dashboard</h1>
-           <p className="mt-2 text-brand-200">Aggregated energy performance data for Panama.</p>
+      <div className="bg-brand-500 py-20 text-center">
+        <div className="max-w-4xl mx-auto px-4">
+           <h1 className="text-4xl font-black text-white mb-4">National Baseline Dashboard</h1>
+           <p className="text-brand-100 text-lg">Real-time aggregated performance benchmarks for Panama's building stock.</p>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-8">
-         <div className="grid gap-6 md:grid-cols-3 mb-8">
-            <Card className="p-6 flex flex-col items-center justify-center text-center">
-               <span className="text-4xl font-bold text-brand-600">{MOCK_BASELINE_STATS.reduce((a,b) => a + b.count, 0)}</span>
-               <span className="text-sm text-gray-500 uppercase tracking-wide mt-1">Buildings Benchmarked</span>
-            </Card>
-            <Card className="p-6 flex flex-col items-center justify-center text-center">
-               <span className="text-4xl font-bold text-brand-600">8</span>
-               <span className="text-sm text-gray-500 uppercase tracking-wide mt-1">Categories Tracked</span>
-            </Card>
-            <Card className="p-6 flex flex-col items-center justify-center text-center">
-               <span className="text-4xl font-bold text-brand-600">2023</span>
-               <span className="text-sm text-gray-500 uppercase tracking-wide mt-1">Baseline Year</span>
-            </Card>
+      <div className="max-w-7xl mx-auto px-4 -mt-10 pb-20">
+         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+            {[
+              { label: 'Verified Records', val: totalBuildings, color: 'brand-500' },
+              { label: 'Active Sectors', val: stats.length, color: 'brand-accent' },
+              { label: 'Baseline Year', val: '2023-24', color: 'brand-secondary' }
+            ].map(stat => (
+              <Card key={stat.label} className="p-8 text-center border-none shadow-xl">
+                 <span className={`text-4xl font-black text-${stat.color}`}>{stat.val}</span>
+                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-2">{stat.label}</p>
+              </Card>
+            ))}
          </div>
 
-         <div className="space-y-8 pb-12">
-            <Card className="p-8">
-               <h2 className="text-xl font-bold text-gray-900 mb-2">Median EUI by Category</h2>
-               <p className="text-sm text-gray-500 mb-6">Energy Use Intensity (kWh/m²/year). Lower is more efficient.</p>
-               
-               <div className="h-80 w-full">
-                 <ResponsiveContainer width="100%" height="100%">
-                   <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                     <XAxis dataKey="category" tick={{fontSize: 12}} interval={0} />
-                     <YAxis />
-                     <Tooltip 
-                       contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
-                       cursor={{fill: '#f1f5f9'}}
-                     />
-                     <Bar dataKey="medianEui" fill="#0ea5e9" name="Median EUI" radius={[4, 4, 0, 0]} />
-                   </BarChart>
-                 </ResponsiveContainer>
-               </div>
-            </Card>
-
-            {insufficient.length > 0 && (
-              <div className="bg-white rounded-lg border border-gray-200 p-6">
-                 <h3 className="text-lg font-medium text-gray-900 mb-3">Emerging Categories</h3>
-                 <p className="text-sm text-gray-500 mb-4">The following categories are collecting data but have not yet reached the privacy threshold ({SAMPLE_THRESHOLD_N} buildings) to display aggregate benchmarks.</p>
-                 <div className="flex flex-wrap gap-2">
-                    {insufficient.map(c => (
-                       <span key={c.category} className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800">
-                          {c.category}
-                       </span>
-                    ))}
-                 </div>
-              </div>
-            )}
-         </div>
+         <Card className="p-10 border-none shadow-2xl">
+            <div className="mb-10">
+               <h2 className="text-2xl font-black text-brand-500">Median Energy Use Intensity (EUI)</h2>
+               <p className="text-gray-500 text-sm mt-1">Comparing median annual kWh/m² across various sectors in Panama.</p>
+            </div>
+            
+            <div className="h-[450px] w-full">
+              {loading ? (
+                <div className="h-full flex items-center justify-center text-gray-300 font-bold italic">Gathering sector data...</div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={stats} margin={{ bottom: 40 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <XAxis 
+                      dataKey="category" 
+                      tick={{fontSize: 10, fontWeight: 'bold', fill: '#64748b'}} 
+                      angle={-45} 
+                      textAnchor="end" 
+                    />
+                    <YAxis tick={{fontSize: 10, fill: '#64748b'}} />
+                    <Tooltip 
+                      cursor={{fill: '#f8fafc'}}
+                      contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)' }}
+                    />
+                    <Bar dataKey="medianEui" fill="#0D362B" radius={[6, 6, 0, 0]} barSize={60} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+         </Card>
       </div>
     </div>
   );

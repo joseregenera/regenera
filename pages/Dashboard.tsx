@@ -1,119 +1,86 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, ChevronRight, Building, Trash2 } from 'lucide-react';
+import { Plus, Building, Trash2, ArrowRight } from 'lucide-react';
 import { Button, Card, Badge } from '../components/ui';
-import { Facility, User, BenchmarkResult } from '../types';
-import { getUserFacilities, calculateBenchmark, deleteFacility } from '../services/storageService';
+import { getUserFacilities, deleteFacility } from '../services/supabaseService';
 
-interface DashboardProps {
-  user: User;
-}
-
-export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
-  const [facilities, setFacilities] = useState<Facility[]>([]);
-  const [results, setResults] = useState<Record<string, BenchmarkResult>>({});
+export const Dashboard: React.FC<{ user: any }> = ({ user }) => {
+  const [facilities, setFacilities] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  const refreshData = () => {
-    const userFacilities = getUserFacilities(user.id);
-    setFacilities(userFacilities);
-    
-    const computed: Record<string, BenchmarkResult> = {};
-    userFacilities.forEach(f => {
-      computed[f.id] = calculateBenchmark(f);
-    });
-    setResults(computed);
+  const load = async () => {
+    setLoading(true);
+    try {
+      const data = await getUserFacilities();
+      setFacilities(data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
-    refreshData();
-  }, [user.id]);
+    load();
+  }, []);
 
-  const handleDelete = (id: string, e: React.MouseEvent) => {
-    e.preventDefault(); // Prevent navigation
-    if (window.confirm("Are you sure? This will remove the facility from your portfolio and the public aggregates.")) {
-      deleteFacility(id);
-      refreshData();
+  const handleDelete = async (id: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    if (confirm("Delete this submission? It will be removed from the national baseline calculations.")) {
+      await deleteFacility(id);
+      load();
     }
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-      <div className="flex md:items-center justify-between mb-8 flex-col md:flex-row gap-4">
+    <div className="max-w-7xl mx-auto px-4 py-16">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-12">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">My Facilities</h1>
-          <p className="text-sm text-gray-500 mt-1">Manage your buildings and view their performance.</p>
+          <h1 className="text-4xl font-black text-brand-500">My Portfolio</h1>
+          <p className="text-gray-500 mt-2 font-medium">Manage and view performance reports for your submitted buildings.</p>
         </div>
-        <Button onClick={() => navigate('/add-facility')}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Facility
+        <Button onClick={() => navigate('/add-facility')} className="px-8 py-4 bg-brand-accent text-brand-500 font-black rounded-xl hover:bg-yellow-500">
+          <Plus size={20} className="mr-2"/> New Submission
         </Button>
       </div>
 
-      {facilities.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-lg border-2 border-dashed border-gray-300">
-          <Building className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-2 text-sm font-medium text-gray-900">No facilities added</h3>
-          <p className="mt-1 text-sm text-gray-500">Get started by creating a new benchmarking record.</p>
-          <div className="mt-6">
-            <Button onClick={() => navigate('/add-facility')}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Facility
-            </Button>
-          </div>
-        </div>
+      {loading ? (
+        <div className="py-20 text-center font-bold text-gray-300 italic">Syncing with database...</div>
+      ) : facilities.length === 0 ? (
+        <Card className="p-20 text-center border-dashed border-2 border-gray-200 shadow-none">
+           <Building className="mx-auto text-gray-200 mb-6" size={64}/>
+           <h3 className="text-xl font-bold text-gray-900">No facilities found</h3>
+           <p className="text-gray-500 mb-8 max-w-sm mx-auto">Start contributing to the baseline by adding your first facility record.</p>
+           <Button onClick={() => navigate('/add-facility')}>Get Started</Button>
+        </Card>
       ) : (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {facilities.map((facility) => {
-            const res = results[facility.id];
-            return (
-              <Link key={facility.id} to={`/facility/${facility.id}`} className="group block">
-                <Card className="h-full hover:shadow-md transition-shadow relative">
-                  <div className="p-6">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <Badge variant="gray">{facility.category}</Badge>
-                        <h3 className="mt-2 text-lg font-medium text-gray-900 group-hover:text-brand-600 truncate max-w-[200px]">
-                          {facility.internalLabel || 'Untitled Facility'}
-                        </h3>
-                        <p className="text-sm text-gray-500">{facility.areaM2.toLocaleString()} m²</p>
-                      </div>
-                      <div className="h-10 w-10 bg-brand-50 rounded-full flex items-center justify-center text-brand-600">
-                        <Building size={20} />
-                      </div>
-                    </div>
-                    
-                    <div className="mt-6 border-t border-gray-100 pt-4">
-                      <div className="flex justify-between items-end">
-                        <div>
-                          <p className="text-xs text-gray-500 uppercase tracking-wide">Annual EUI</p>
-                          <p className="text-2xl font-bold text-gray-900">
-                            {res ? Math.round(res.eui) : '-'} <span className="text-xs font-normal text-gray-500">kWh/m²/yr</span>
-                          </p>
-                        </div>
-                         {res && res.percentile > 0 && res.isSufficientData && (
-                            <div className="text-right">
-                                <Badge variant={res.percentile > 75 ? 'success' : res.percentile > 25 ? 'warning' : 'gray'}>
-                                  Top {100 - res.percentile}%
-                                </Badge>
-                            </div>
-                         )}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="bg-gray-50 px-6 py-3 flex justify-between items-center">
-                     <span className="text-xs text-brand-600 font-medium group-hover:underline">View Details</span>
-                     <button 
-                       onClick={(e) => handleDelete(facility.id, e)}
-                       className="text-gray-400 hover:text-red-600 transition-colors p-1"
-                     >
-                       <Trash2 size={14} />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+           {facilities.map(f => (
+             <Link key={f.id} to={`/facility/${f.id}`} className="group">
+               <Card className="h-full border-none shadow-lg hover:shadow-2xl transition-all p-8 flex flex-col">
+                  <div className="flex justify-between items-start mb-6">
+                     <div className="w-12 h-12 rounded-2xl bg-brand-50 flex items-center justify-center text-brand-500">
+                        <Building size={24}/>
+                     </div>
+                     <button onClick={e => handleDelete(f.id, e)} className="text-gray-300 hover:text-red-500 transition-colors">
+                        <Trash2 size={16}/>
                      </button>
                   </div>
-                </Card>
-              </Link>
-            );
-          })}
+                  
+                  <Badge variant="gray" className="mb-2 self-start">{f.category}</Badge>
+                  <h3 className="text-xl font-black text-brand-500 group-hover:text-brand-secondary transition-colors mb-2">
+                    {f.internalLabel || "Unnamed Facility"}
+                  </h3>
+                  <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">{f.areaM2} m²</p>
+                  
+                  <div className="mt-auto pt-8 flex items-center justify-between text-brand-500 font-black border-t border-gray-50">
+                     <span className="text-sm uppercase tracking-tighter">View Report</span>
+                     <ArrowRight size={18} className="transform group-hover:translate-x-2 transition-transform"/>
+                  </div>
+               </Card>
+             </Link>
+           ))}
         </div>
       )}
     </div>

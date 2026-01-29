@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronRight, ChevronLeft, Upload, AlertCircle } from 'lucide-react';
 import { Button, Card, Input, Select } from '../components/ui';
-import { BuildingCategory, Facility, MonthlyData, User } from '../types';
+import { BuildingCategory, User } from '../types';
 import { CATEGORIES_LIST, MONTH_NAMES } from '../constants';
-import { saveFacility } from '../services/storageService';
+import { saveFacility } from '../services/supabaseService';
 
 interface WizardProps {
   user: User;
@@ -14,232 +14,145 @@ export const Wizard: React.FC<WizardProps> = ({ user }) => {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Form State
   const [internalLabel, setInternalLabel] = useState('');
   const [category, setCategory] = useState<BuildingCategory | ''>('');
   const [area, setArea] = useState('');
   
-  // Initialize with empty monthly data
-  const [monthlyData, setMonthlyData] = useState<MonthlyData[]>(
-    MONTH_NAMES.map((_, i) => ({ month: i + 1, year: new Date().getFullYear() - 1, kwh: 0, cost: undefined }))
-  );
+  const [monthlyKwh, setMonthlyKwh] = useState<string[]>(new Array(12).fill(''));
 
-  const handleMonthlyChange = (index: number, field: 'kwh' | 'cost', value: string) => {
-    const newData = [...monthlyData];
-    const val = value === '' ? 0 : parseFloat(value);
-    
-    if (field === 'kwh') newData[index].kwh = val;
-    if (field === 'cost') newData[index].cost = value === '' ? undefined : val;
-    
-    setMonthlyData(newData);
+  const handleKwhChange = (index: number, value: string) => {
+    const newData = [...monthlyKwh];
+    newData[index] = value;
+    setMonthlyKwh(newData);
   };
 
   const validateStep1 = () => {
     return category && area && parseFloat(area) > 0;
   };
 
+  const validateStep2 = () => {
+    return monthlyKwh.every(val => val !== '' && !isNaN(parseFloat(val)) && parseFloat(val) >= 0);
+  };
+
   const handleSubmit = async () => {
     setIsLoading(true);
+    setError(null);
     try {
-      const facility: Facility = {
-        id: crypto.randomUUID(),
-        userId: user.id,
-        internalLabel: internalLabel || undefined,
+      const numericKwh = monthlyKwh.map(v => parseFloat(v));
+      const result = await saveFacility({
+        internalLabel,
         category: category as BuildingCategory,
         areaM2: parseFloat(area),
-        createdAt: new Date().toISOString(),
-        data: monthlyData
-      };
+        monthly_kwh: numericKwh
+      });
 
-      await saveFacility(facility);
-      navigate(`/facility/${facility.id}`);
-    } catch (e) {
+      navigate(`/facility/${result.id}`);
+    } catch (e: any) {
+      setError(e.message || "Failed to save submission");
       console.error(e);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Mock CSV Parser
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    
-    // In a real app, parse CSV. Here, we'll just fill with dummy data for UX demo.
-    const dummy = monthlyData.map(m => ({ ...m, kwh: Math.floor(Math.random() * 5000) + 1000 }));
-    setMonthlyData(dummy);
-    alert("Mock CSV parsed: Data populated with random values for demonstration.");
-  };
-
   return (
-    <div className="max-w-3xl mx-auto px-4 py-10">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Add New Facility</h1>
-        <div className="mt-4 flex items-center">
-          <div className={`flex items-center ${step >= 1 ? 'text-brand-600' : 'text-gray-400'}`}>
-            <span className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${step >= 1 ? 'border-brand-600 bg-brand-50' : 'border-gray-300'}`}>1</span>
-            <span className="ml-2 font-medium">Basics</span>
-          </div>
-          <div className="w-12 h-px bg-gray-300 mx-4"></div>
-          <div className={`flex items-center ${step >= 2 ? 'text-brand-600' : 'text-gray-400'}`}>
-            <span className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${step >= 2 ? 'border-brand-600 bg-brand-50' : 'border-gray-300'}`}>2</span>
-            <span className="ml-2 font-medium">Energy Data</span>
-          </div>
-          <div className="w-12 h-px bg-gray-300 mx-4"></div>
-          <div className={`flex items-center ${step >= 3 ? 'text-brand-600' : 'text-gray-400'}`}>
-             <span className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${step >= 3 ? 'border-brand-600 bg-brand-50' : 'border-gray-300'}`}>3</span>
-             <span className="ml-2 font-medium">Review</span>
-          </div>
-        </div>
+    <div className="max-w-4xl mx-auto px-4 py-16">
+      <div className="text-center mb-12">
+        <h1 className="text-3xl font-extrabold text-gray-900">Benchmark Your Facility</h1>
+        <p className="text-gray-500 mt-2">Accurate data ensures a stronger national baseline.</p>
       </div>
 
-      <Card className="p-6">
-        {step === 1 && (
-          <div className="space-y-6">
-            <div>
-              <h3 className="text-lg font-medium text-gray-900">Facility Information</h3>
-              <p className="text-sm text-gray-500">This information is used to categorize your building. The internal label is private.</p>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="md:col-span-1 space-y-4">
+           {[
+             { n: 1, t: 'Facility Basics' },
+             { n: 2, t: 'Energy Consumption' },
+             { n: 3, t: 'Confirm & Submit' }
+           ].map(s => (
+             <div key={s.n} className={`flex items-center gap-3 p-4 rounded-lg transition-all ${step === s.n ? 'bg-brand-50 border-l-4 border-brand-500' : 'bg-white text-gray-400'}`}>
+                <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${step === s.n ? 'bg-brand-500 text-white' : 'bg-gray-100'}`}>{s.n}</span>
+                <span className="font-bold text-sm">{s.t}</span>
+             </div>
+           ))}
+        </div>
+
+        <Card className="md:col-span-2 p-8 border-none shadow-xl">
+          {error && (
+            <div className="mb-6 p-4 bg-red-50 text-red-700 rounded-lg flex items-center gap-2">
+              <AlertCircle size={20}/> {error}
             </div>
-            
-            <Input 
-              label="Internal Label (Optional)" 
-              placeholder="e.g. Building A, Main HQ" 
-              value={internalLabel}
-              onChange={(e) => setInternalLabel(e.target.value)}
-            />
-            
-            <Select
-              label="Facility Category *"
-              value={category}
-              onChange={(e) => setCategory(e.target.value as BuildingCategory)}
-              options={CATEGORIES_LIST.map(c => ({ value: c, label: c }))}
-            />
+          )}
 
-            <Input 
-              label="Gross Floor Area (m²) *" 
-              type="number"
-              placeholder="e.g. 1500" 
-              value={area}
-              onChange={(e) => setArea(e.target.value)}
-            />
-
-            <div className="flex justify-end">
-              <Button onClick={() => setStep(2)} disabled={!validateStep1()}>
-                Next Step <ChevronRight size={16} className="ml-2" />
-              </Button>
+          {step === 1 && (
+            <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
+              <Input label="Building Reference (Private)" placeholder="e.g. Panama HQ" value={internalLabel} onChange={e => setInternalLabel(e.target.value)} />
+              <Select label="Sector Type *" value={category} onChange={e => setCategory(e.target.value as any)} options={CATEGORIES_LIST.map(c => ({ value: c, label: c }))} />
+              <Input label="Gross Floor Area (m²) *" type="number" placeholder="0.00" value={area} onChange={e => setArea(e.target.value)} />
+              <div className="flex justify-end pt-4"><Button onClick={() => setStep(2)} disabled={!validateStep1()}>Continue <ChevronRight size={16}/></Button></div>
             </div>
-          </div>
-        )}
+          )}
 
-        {step === 2 && (
-          <div className="space-y-6">
-             <div className="flex justify-between items-start">
-               <div>
-                <h3 className="text-lg font-medium text-gray-900">Energy Consumption</h3>
-                <p className="text-sm text-gray-500">Enter electricity usage for the last 12 months.</p>
-               </div>
-               <div className="relative overflow-hidden inline-block">
-                  <Button variant="outline" className="relative">
-                    <Upload size={16} className="mr-2" /> Upload CSV
-                    <input type="file" accept=".csv" onChange={handleFileUpload} className="absolute inset-0 opacity-0 cursor-pointer" />
-                  </Button>
-               </div>
-            </div>
-
-            <div className="bg-blue-50 p-4 rounded-md flex items-start">
-               <AlertCircle className="text-blue-500 mt-0.5 mr-3 flex-shrink-0" size={18} />
-               <p className="text-sm text-blue-700">
-                 <strong>Privacy Note:</strong> Your monthly data is stored securely and only used to compute your annual EUI. It is never shared raw.
-               </p>
-            </div>
-
-            <div className="border rounded-md overflow-hidden">
-              <div className="grid grid-cols-12 bg-gray-50 border-b p-2 text-xs font-semibold text-gray-500 uppercase">
-                <div className="col-span-4 pl-2">Month</div>
-                <div className="col-span-4">kWh *</div>
-                <div className="col-span-4">Cost ($) <span className="text-gray-400 normal-case font-normal">(Optional)</span></div>
+          {step === 2 && (
+            <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
+              <div className="bg-brand-50 p-4 rounded-lg flex gap-3">
+                 <AlertCircle className="text-brand-500 flex-shrink-0" size={20}/>
+                 <p className="text-xs text-brand-700 font-medium">Please provide the actual monthly kWh for the last 12-month period. All values must be greater than or equal to zero.</p>
               </div>
-              <div className="max-h-[400px] overflow-y-auto">
-                {monthlyData.map((data, idx) => (
-                  <div key={idx} className="grid grid-cols-12 border-b last:border-0 p-2 items-center hover:bg-gray-50">
-                    <div className="col-span-4 pl-2 text-sm font-medium text-gray-700">
-                      {MONTH_NAMES[data.month - 1]}
-                    </div>
-                    <div className="col-span-4 pr-2">
-                       <input 
-                         type="number" 
-                         className="w-full border-gray-300 rounded-md text-sm py-1 px-2 focus:ring-brand-500 focus:border-brand-500 border"
-                         value={data.kwh || ''}
-                         onChange={(e) => handleMonthlyChange(idx, 'kwh', e.target.value)}
-                         placeholder="0"
-                       />
-                    </div>
-                    <div className="col-span-4">
-                       <input 
-                         type="number" 
-                         className="w-full border-gray-300 rounded-md text-sm py-1 px-2 focus:ring-brand-500 focus:border-brand-500 border"
-                         value={data.cost || ''}
-                         onChange={(e) => handleMonthlyChange(idx, 'cost', e.target.value)}
-                         placeholder="Optional"
-                       />
-                    </div>
+              
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                {MONTH_NAMES.map((m, i) => (
+                  <div key={m}>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">{m}</label>
+                    <input 
+                      type="number"
+                      className="w-full border-gray-200 rounded-md p-2 text-sm focus:ring-brand-500 focus:border-brand-500 border"
+                      placeholder="kWh"
+                      value={monthlyKwh[i]}
+                      onChange={e => handleKwhChange(i, e.target.value)}
+                    />
                   </div>
                 ))}
               </div>
-            </div>
 
-            <div className="flex justify-between">
-              <Button variant="outline" onClick={() => setStep(1)}>
-                <ChevronLeft size={16} className="mr-2" /> Back
-              </Button>
-              <Button onClick={() => setStep(3)}>
-                Review <ChevronRight size={16} className="ml-2" />
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {step === 3 && (
-          <div className="space-y-6">
-            <h3 className="text-lg font-medium text-gray-900">Review & Submit</h3>
-            
-            <div className="bg-gray-50 p-4 rounded-md space-y-3">
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="text-gray-500 block">Category</span>
-                  <span className="font-medium">{category}</span>
-                </div>
-                <div>
-                  <span className="text-gray-500 block">Area</span>
-                  <span className="font-medium">{area} m²</span>
-                </div>
-                <div>
-                  <span className="text-gray-500 block">Total Annual kWh</span>
-                  <span className="font-medium text-brand-600">{monthlyData.reduce((a, b) => a + b.kwh, 0).toLocaleString()} kWh</span>
-                </div>
-                <div>
-                  <span className="text-gray-500 block">Calculated EUI</span>
-                  <span className="font-medium text-brand-600">{(monthlyData.reduce((a, b) => a + b.kwh, 0) / parseFloat(area)).toFixed(1)} kWh/m²</span>
-                </div>
+              <div className="flex justify-between pt-6 border-t">
+                <Button variant="outline" onClick={() => setStep(1)}><ChevronLeft size={16}/> Back</Button>
+                <Button onClick={() => setStep(3)} disabled={!validateStep2()}>Next Step <ChevronRight size={16}/></Button>
               </div>
             </div>
+          )}
 
-            <p className="text-sm text-gray-500">
-              By submitting, you agree to add this anonymous data to the national dataset managed by Regenera.
-            </p>
+          {step === 3 && (
+            <div className="space-y-8 animate-in fade-in slide-in-from-right-4">
+               <div className="text-center">
+                  <h3 className="text-xl font-bold text-gray-900">Review Submission</h3>
+                  <p className="text-sm text-gray-500 mt-1">This data will be anonymized into the public baseline.</p>
+               </div>
+               
+               <div className="bg-gray-50 rounded-xl p-6 grid grid-cols-2 gap-y-6">
+                  <div>
+                    <span className="text-[10px] font-bold text-gray-400 uppercase block">Sector</span>
+                    <span className="font-bold text-brand-500">{category}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold text-gray-400 uppercase block">Total Area</span>
+                    <span className="font-bold text-brand-500">{area} m²</span>
+                  </div>
+                  <div className="col-span-2 border-t pt-4">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase block">Annual Consumption</span>
+                    <span className="text-2xl font-black text-brand-500">{monthlyKwh.reduce((a,b) => a + (parseFloat(b)||0), 0).toLocaleString()} <span className="text-sm font-normal">kWh/year</span></span>
+                  </div>
+               </div>
 
-            <div className="flex justify-between pt-4">
-              <Button variant="outline" onClick={() => setStep(2)}>
-                <ChevronLeft size={16} className="mr-2" /> Back
-              </Button>
-              <Button onClick={handleSubmit} isLoading={isLoading}>
-                Submit Facility
-              </Button>
+               <div className="flex justify-between pt-4">
+                <Button variant="outline" onClick={() => setStep(2)}><ChevronLeft size={16}/> Back</Button>
+                <Button onClick={handleSubmit} isLoading={isLoading}>Submit Benchmark</Button>
+              </div>
             </div>
-          </div>
-        )}
-      </Card>
+          )}
+        </Card>
+      </div>
     </div>
   );
 };
