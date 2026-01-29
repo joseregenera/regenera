@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, BarChart2, Lock, FileText, Zap } from 'lucide-react';
+import { BarChart2, Lock, FileText, Zap } from 'lucide-react';
 import { Button } from '../components/ui';
 
 export const LandingPage: React.FC = () => {
@@ -27,7 +27,7 @@ export const LandingPage: React.FC = () => {
             Join the movement towards a more efficient Panama.
           </p>
           <div className="mt-10 flex gap-4">
-            <Button onClick={() => navigate('/login')} className="px-8 py-3 text-base">
+            <Button onClick={() => navigate('/add-facility')} className="px-8 py-3 text-base">
               Start Benchmarking
             </Button>
             <Button onClick={() => navigate('/public-benchmark')} variant="secondary" className="px-8 py-3 text-base">
@@ -88,7 +88,6 @@ export const LandingPage: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <p className="text-sm font-semibold text-gray-400 tracking-wider uppercase">In Partnership With</p>
           <div className="mt-6 flex justify-center items-center gap-12 grayscale opacity-70 hover:grayscale-0 hover:opacity-100 transition-all">
-            {/* Placeholders for logos */}
              <div className="flex flex-col items-center">
                 <div className="h-16 w-16 bg-gray-200 rounded-full flex items-center justify-center mb-2">
                     <span className="font-bold text-gray-400">R</span>

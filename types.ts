@@ -1,15 +1,3 @@
-export enum UserRole {
-  USER = 'USER',
-  ADMIN = 'ADMIN',
-  APAFAM_MEMBER = 'APAFAM_MEMBER'
-}
-
-export interface User {
-  id: string;
-  email: string;
-  role: UserRole;
-  name: string;
-}
 
 export enum BuildingCategory {
   OFFICE = 'Office',
@@ -22,6 +10,14 @@ export enum BuildingCategory {
   OTHER = 'Other'
 }
 
+// User interface added to resolve import errors in storageService.ts and Login.tsx
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  role: 'ADMIN' | 'USER';
+}
+
 export interface MonthlyData {
   month: number; // 1-12
   year: number;
@@ -31,12 +27,15 @@ export interface MonthlyData {
 
 export interface Facility {
   id: string;
-  userId: string;
-  internalLabel?: string; // Private
+  // userId and data added to support local storage service logic
+  userId?: string;
+  internalLabel?: string;
   category: BuildingCategory;
   areaM2: number;
   createdAt: string;
-  data: MonthlyData[];
+  annual_kwh: number;
+  eui: number;
+  data?: MonthlyData[];
 }
 
 export interface BenchmarkResult {

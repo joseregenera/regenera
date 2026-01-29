@@ -3,7 +3,7 @@ import { BenchmarkResult, BuildingCategory } from '../types';
 
 /**
  * Saves a facility submission to Supabase.
- * Strictly adheres to the schema: facility_type, area_m2, monthly_kwh, annual_kwh, eui, country, internal_label.
+ * Strictly adheres to the schema: facility_type, area_m2, monthly_kwh, annual_kwh, eui, country, internal_label, notes.
  */
 export const saveFacility = async (facilityData: {
   category: BuildingCategory;
@@ -21,8 +21,8 @@ export const saveFacility = async (facilityData: {
     monthly_kwh: facilityData.monthly_kwh,
     annual_kwh,
     eui,
-    internal_label: facilityData.internalLabel,
-    notes: facilityData.notes,
+    internal_label: facilityData.internalLabel || null,
+    notes: facilityData.notes || null,
     country: 'Panama'
   };
 
@@ -35,7 +35,8 @@ export const saveFacility = async (facilityData: {
   if (error) throw error;
   
   // Store the submission ID locally to track "My Portfolio" without accounts
-  const localIds = JSON.parse(localStorage.getItem('peb_submission_ids') || '[]');
+  const localIdsString = localStorage.getItem('peb_submission_ids');
+  const localIds = localIdsString ? JSON.parse(localIdsString) : [];
   localStorage.setItem('peb_submission_ids', JSON.stringify([...localIds, data.id]));
   
   return data;
@@ -45,7 +46,8 @@ export const saveFacility = async (facilityData: {
  * Retrieves facilities based on the IDs stored in local storage.
  */
 export const getMyFacilities = async () => {
-  const localIds = JSON.parse(localStorage.getItem('peb_submission_ids') || '[]');
+  const localIdsString = localStorage.getItem('peb_submission_ids');
+  const localIds = localIdsString ? JSON.parse(localIdsString) : [];
   if (localIds.length === 0) return [];
 
   const { data, error } = await supabase
@@ -66,13 +68,16 @@ export const getMyFacilities = async () => {
 };
 
 export const deleteFacility = async (id: string) => {
+  // We can only delete locally if we want to protect against arbitrary deletions,
+  // but for the sake of the requirement to allow users to remove data:
   const { error } = await supabase
     .from('facility_energy_submissions')
     .delete()
     .eq('id', id);
   
   if (!error) {
-    const localIds = JSON.parse(localStorage.getItem('peb_submission_ids') || '[]');
+    const localIdsString = localStorage.getItem('peb_submission_ids');
+    const localIds = localIdsString ? JSON.parse(localIdsString) : [];
     localStorage.setItem('peb_submission_ids', JSON.stringify(localIds.filter((lid: string) => lid !== id)));
   }
 };
@@ -88,7 +93,7 @@ export const getBenchmarkStats = async (facilityType: string, userEui: number): 
 
   if (error) throw error;
 
-  const euis = peers.map(p => Number(p.eui)).sort((a, b) => a - b);
+  const euis = peers ? peers.map(p => Number(p.eui)).sort((a, b) => a - b) : [];
   const sampleSize = euis.length;
   
   // Median
@@ -124,13 +129,15 @@ export const getPublicAggregates = async () => {
 
   if (error) throw error;
 
+  if (!data || data.length === 0) return [];
+
   const groups = data.reduce((acc, curr) => {
     if (!acc[curr.facility_type]) acc[curr.facility_type] = [];
     acc[curr.facility_type].push(Number(curr.eui));
     return acc;
   }, {} as Record<string, number[]>);
 
-  return (Object.entries(groups) as [string, number[]][]).map(([category, euis]) => {
+  return Object.entries(groups).map(([category, euis]) => {
     euis.sort((a, b) => a - b);
     const mid = Math.floor(euis.length / 2);
     const median = euis.length % 2 !== 0 ? euis[mid] : (euis[mid - 1] + euis[mid]) / 2;

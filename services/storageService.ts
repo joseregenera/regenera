@@ -1,3 +1,4 @@
+
 import { Facility, User, BenchmarkResult, MonthlyData, BuildingCategory } from '../types';
 import { SAMPLE_THRESHOLD_N, MOCK_BASELINE_STATS } from '../constants';
 
@@ -14,7 +15,8 @@ export const loginUser = async (email: string): Promise<User> => {
     id: 'u_' + Math.random().toString(36).substr(2, 9),
     email,
     name: email.split('@')[0],
-    role: email.includes('admin') ? 'ADMIN' as any : 'USER' as any
+    // Removed unnecessary 'as any' casting as User.role is now correctly typed
+    role: email.includes('admin') ? 'ADMIN' : 'USER'
   };
   localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
   return user;
@@ -61,8 +63,9 @@ export const calculateBenchmark = (facility: Facility): BenchmarkResult => {
   const year = new Date().getFullYear() - 1; // Last complete year assumption
   
   // Sums
-  const annualKwh = facility.data.reduce((acc, curr) => acc + curr.kwh, 0);
-  const annualCost = facility.data.reduce((acc, curr) => acc + (curr.cost || 0), 0);
+  // Added safety check for facility.data existence before reducing
+  const annualKwh = (facility.data || []).reduce((acc, curr) => acc + curr.kwh, 0);
+  const annualCost = (facility.data || []).reduce((acc, curr) => acc + (curr.cost || 0), 0);
   
   const eui = annualKwh / facility.areaM2;
   const costIntensity = annualCost > 0 ? annualCost / facility.areaM2 : 0;
