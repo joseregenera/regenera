@@ -1,4 +1,4 @@
-import supabase from '../lib/supabaseClient';
+import supabase, { isSupabaseConfigured } from '../lib/supabaseClient';
 import { BenchmarkResult, BuildingCategory } from '../types';
 
 /**
@@ -12,6 +12,10 @@ export const saveFacility = async (facilityData: {
   internalLabel?: string;
   notes?: string;
 }) => {
+  if (!isSupabaseConfigured) {
+    throw new Error("Application is not connected to a database. Please check environment variables.");
+  }
+
   const annual_kwh = facilityData.monthly_kwh.reduce((a, b) => a + b, 0);
   const eui = annual_kwh / (facilityData.areaM2 || 1);
 
@@ -50,6 +54,8 @@ export const saveFacility = async (facilityData: {
  * Retrieves facilities based on the IDs stored in local storage.
  */
 export const getMyFacilities = async () => {
+  if (!isSupabaseConfigured) return [];
+
   const localIdsString = localStorage.getItem('peb_submission_ids');
   const localIds = localIdsString ? JSON.parse(localIdsString) : [];
   if (localIds.length === 0) return [];
@@ -72,6 +78,8 @@ export const getMyFacilities = async () => {
 };
 
 export const deleteFacility = async (id: string) => {
+  if (!isSupabaseConfigured) return;
+
   const { error } = await supabase
     .from('facility_energy_submissions')
     .delete()
@@ -88,6 +96,10 @@ export const deleteFacility = async (id: string) => {
  * Computes benchmark statistics from the actual Supabase dataset.
  */
 export const getBenchmarkStats = async (facilityType: string, userEui: number): Promise<BenchmarkResult> => {
+  if (!isSupabaseConfigured) {
+    throw new Error("Benchmarking unavailable: Database connection missing.");
+  }
+
   const { data: peers, error } = await supabase
     .from('facility_energy_submissions')
     .select('eui')
@@ -122,6 +134,8 @@ export const getBenchmarkStats = async (facilityType: string, userEui: number): 
 };
 
 export const getPublicAggregates = async () => {
+  if (!isSupabaseConfigured) return [];
+
   const { data, error } = await supabase
     .from('facility_energy_submissions')
     .select('facility_type, eui');
