@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronRight, ChevronLeft, AlertCircle } from 'lucide-react';
+import { ChevronRight, ChevronLeft, AlertCircle, Settings } from 'lucide-react';
 import { Button, Card, Input, Select } from '../components/ui';
 import { BuildingCategory } from '../types';
 import { CATEGORIES_LIST, MONTH_NAMES } from '../constants';
 import { saveFacility } from '../services/supabaseService';
+import { isSupabaseConfigured } from '../lib/supabaseClient';
 
 export const Wizard: React.FC = () => {
   const navigate = useNavigate();
@@ -33,6 +34,11 @@ export const Wizard: React.FC = () => {
   };
 
   const handleSubmit = async () => {
+    if (!isSupabaseConfigured) {
+      setError("System misconfigured: Missing environment variables.");
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     try {
@@ -52,6 +58,24 @@ export const Wizard: React.FC = () => {
       setIsLoading(false);
     }
   };
+
+  if (!isSupabaseConfigured) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-20">
+        <Card className="p-12 border-red-200 bg-red-50 text-center">
+          <Settings className="mx-auto h-16 w-16 text-red-600 mb-6 animate-pulse" />
+          <h2 className="text-2xl font-black text-red-800 mb-4">System Configuration Error</h2>
+          <p className="text-red-700 max-w-lg mx-auto mb-8 font-medium">
+            Missing <strong>VITE_SUPABASE_URL</strong> or <strong>VITE_SUPABASE_ANON_KEY</strong>. 
+            Please configure these variables in Vercel and redeploy the application to enable benchmarks.
+          </p>
+          <div className="flex justify-center gap-4">
+             <Button variant="outline" onClick={() => navigate('/')}>Return Home</Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-16">

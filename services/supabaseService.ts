@@ -3,7 +3,7 @@ import { BenchmarkResult, BuildingCategory } from '../types';
 
 /**
  * Saves a facility submission to Supabase.
- * Strictly adheres to the schema: facility_type, area_m2, monthly_kwh, annual_kwh, eui, country, internal_label, notes.
+ * Schema: facility_type, area_m2, monthly_kwh, annual_kwh, eui, country, internal_label, notes.
  */
 export const saveFacility = async (facilityData: {
   category: BuildingCategory;
@@ -15,6 +15,7 @@ export const saveFacility = async (facilityData: {
   const annual_kwh = facilityData.monthly_kwh.reduce((a, b) => a + b, 0);
   const eui = annual_kwh / (facilityData.areaM2 || 1);
 
+  // Exact payload matching the Supabase table schema
   const payload = {
     facility_type: facilityData.category,
     area_m2: facilityData.areaM2,
@@ -29,10 +30,13 @@ export const saveFacility = async (facilityData: {
   const { data, error } = await supabase
     .from('facility_energy_submissions')
     .insert([payload])
-    .select()
+    .select('id, created_at, facility_type, area_m2, annual_kwh, eui, internal_label')
     .single();
 
-  if (error) throw error;
+  if (error) {
+    console.error("Supabase Insert Error:", error.message);
+    throw new Error(error.message);
+  }
   
   // Store the submission ID locally to track "My Portfolio" without accounts
   const localIdsString = localStorage.getItem('peb_submission_ids');
@@ -52,14 +56,14 @@ export const getMyFacilities = async () => {
 
   const { data, error } = await supabase
     .from('facility_energy_submissions')
-    .select('*')
+    .select('id, created_at, facility_type, area_m2, annual_kwh, eui, internal_label')
     .in('id', localIds);
 
   if (error) throw error;
-  return data.map(row => ({
+  return (data || []).map(row => ({
     id: row.id,
     internalLabel: row.internal_label,
-    category: row.facility_type,
+    category: row.facility_type as BuildingCategory,
     areaM2: row.area_m2,
     createdAt: row.created_at,
     annual_kwh: row.annual_kwh,
@@ -68,8 +72,6 @@ export const getMyFacilities = async () => {
 };
 
 export const deleteFacility = async (id: string) => {
-  // We can only delete locally if we want to protect against arbitrary deletions,
-  // but for the sake of the requirement to allow users to remove data:
   const { error } = await supabase
     .from('facility_energy_submissions')
     .delete()
@@ -96,21 +98,18 @@ export const getBenchmarkStats = async (facilityType: string, userEui: number): 
   const euis = peers ? peers.map(p => Number(p.eui)).sort((a, b) => a - b) : [];
   const sampleSize = euis.length;
   
-  // Median
   let categoryMedianEui = 0;
   if (sampleSize > 0) {
     const mid = Math.floor(sampleSize / 2);
     categoryMedianEui = sampleSize % 2 !== 0 ? euis[mid] : (euis[mid - 1] + euis[mid]) / 2;
   }
 
-  // Percentile (Lower EUI is better, so rank-based percentile where 100 is most efficient)
-  // Percentile = (Number of peers with higher EUI / Total) * 100
   const higherThan = euis.filter(e => e > userEui).length;
   const percentile = sampleSize > 0 ? Math.round((higherThan / sampleSize) * 100) : 0;
 
   return {
     facilityId: '',
-    year: 2023,
+    year: 2024,
     annualKwh: 0, 
     annualCost: 0,
     eui: userEui,
@@ -128,7 +127,6 @@ export const getPublicAggregates = async () => {
     .select('facility_type, eui');
 
   if (error) throw error;
-
   if (!data || data.length === 0) return [];
 
   const groups = data.reduce((acc, curr) => {

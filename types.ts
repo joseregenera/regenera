@@ -10,7 +10,9 @@ export enum BuildingCategory {
   OTHER = 'Other'
 }
 
-// User interface added to resolve import errors in storageService.ts and Login.tsx
+/**
+ * User interface for application authentication.
+ */
 export interface User {
   id: string;
   email: string;
@@ -22,12 +24,13 @@ export interface MonthlyData {
   month: number; // 1-12
   year: number;
   kwh: number;
+  // Added optional cost property used in calculateBenchmark
   cost?: number;
 }
 
 export interface Facility {
   id: string;
-  // userId and data added to support local storage service logic
+  // Added optional userId for filtering user-specific facilities
   userId?: string;
   internalLabel?: string;
   category: BuildingCategory;
@@ -35,6 +38,7 @@ export interface Facility {
   createdAt: string;
   annual_kwh: number;
   eui: number;
+  // Added optional data property for monthly consumption history
   data?: MonthlyData[];
 }
 
